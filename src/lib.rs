@@ -269,5 +269,6 @@ mod tests {
         t.pass("tests/cases/test_enum_conversions.rs");
         t.pass("tests/cases/test_struct_conversions.rs");
         t.pass("tests/cases/test_field_attributes.rs");
+        t.pass("tests/cases/test_nested_containers.rs");
     }
 }

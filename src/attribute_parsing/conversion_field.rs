@@ -3,7 +3,7 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, format_ident, quote};
 use syn::{Field, Ident, Path, spanned::Spanned};
 
-use crate::util::is_surrounding_type;
+use crate::util::{extract_hashmap_inner_types, extract_inner_type, is_surrounding_type};
 
 use super::conversion_meta::ConversionMethod;
 
@@ -72,12 +72,12 @@ struct ConvertField {
 #[derive(Clone)]
 pub(crate) enum FieldConversionMethod {
     Plain,
-    UnwrapOption,
-    UnwrapOrDefault,
-    SomeOption,
-    Option,
-    Iterator,
-    HashMap,
+    UnwrapOption(Box<FieldConversionMethod>),
+    UnwrapOrDefault(Box<FieldConversionMethod>),
+    SomeOption(Box<FieldConversionMethod>),
+    Option(Box<FieldConversionMethod>),
+    Iterator(Box<FieldConversionMethod>),
+    HashMap(Box<FieldConversionMethod>, Box<FieldConversionMethod>),
 }
 
 #[derive(Clone)]
@@ -225,6 +225,25 @@ pub(crate) fn extract_convertible_fields(
     Ok(result)
 }
 
+/// Recursively determines the conversion method for a type by inspecting
+/// nested container types (Option, Vec, HashMap).
+fn decide_field_method_for_type(ty: &syn::Type) -> FieldConversionMethod {
+    if let Some(inner_ty) = extract_inner_type(ty, "Option") {
+        let inner = decide_field_method_for_type(inner_ty);
+        return FieldConversionMethod::Option(Box::new(inner));
+    }
+    if let Some(inner_ty) = extract_inner_type(ty, "Vec") {
+        let inner = decide_field_method_for_type(inner_ty);
+        return FieldConversionMethod::Iterator(Box::new(inner));
+    }
+    if let Some((key_ty, val_ty)) = extract_hashmap_inner_types(ty) {
+        let key_inner = decide_field_method_for_type(key_ty);
+        let val_inner = decide_field_method_for_type(val_ty);
+        return FieldConversionMethod::HashMap(Box::new(key_inner), Box::new(val_inner));
+    }
+    FieldConversionMethod::Plain
+}
+
 pub(crate) fn decide_field_method(
     field: &Field,
     is_from: bool,
@@ -232,8 +251,6 @@ pub(crate) fn decide_field_method(
     unwrap_or_default: bool,
 ) -> syn::Result<FieldConversionMethod> {
     let is_option = is_surrounding_type(&field.ty, "Option");
-    let is_vec = is_surrounding_type(&field.ty, "Vec");
-    let is_hash_map = is_surrounding_type(&field.ty, "HashMap");
 
     if unwrap && unwrap_or_default {
         return Err(syn::Error::new_spanned(
@@ -242,22 +259,38 @@ pub(crate) fn decide_field_method(
         ));
     }
 
-    let unwrap_option = unwrap
-        .then_some(FieldConversionMethod::UnwrapOption)
-        .or(unwrap_or_default.then_some(FieldConversionMethod::UnwrapOrDefault));
-
-    if let Some(unwrap) = unwrap_option {
+    if unwrap || unwrap_or_default {
         match (is_option, is_from) {
             (true, false) => {
-                return Ok(unwrap);
+                // Option<T> -> T: unwrap, then recursively convert inner
+                let inner_ty = extract_inner_type(&field.ty, "Option").unwrap();
+                let inner_method = decide_field_method_for_type(inner_ty);
+                return if unwrap {
+                    Ok(FieldConversionMethod::UnwrapOption(Box::new(inner_method)))
+                } else {
+                    Ok(FieldConversionMethod::UnwrapOrDefault(Box::new(
+                        inner_method,
+                    )))
+                };
             }
             (true, true) => {
-                return Ok(FieldConversionMethod::SomeOption);
+                // From direction: T -> Option<T>, wrap in Some
+                let inner_ty = extract_inner_type(&field.ty, "Option").unwrap();
+                let inner_method = decide_field_method_for_type(inner_ty);
+                return Ok(FieldConversionMethod::SomeOption(Box::new(inner_method)));
             }
             (false, true) => {
-                return Ok(unwrap);
+                // From direction: other side has Option<T>, self has T
+                let inner_method = decide_field_method_for_type(&field.ty);
+                return if unwrap {
+                    Ok(FieldConversionMethod::UnwrapOption(Box::new(inner_method)))
+                } else {
+                    Ok(FieldConversionMethod::UnwrapOrDefault(Box::new(
+                        inner_method,
+                    )))
+                };
             }
-            _ => {
+            (false, false) => {
                 return Err(syn::Error::new_spanned(
                     &field.ty,
                     "Cannot unwrap non-Option field",
@@ -266,18 +299,8 @@ pub(crate) fn decide_field_method(
         }
     }
 
-    if is_option {
-        return Ok(FieldConversionMethod::Option);
-    }
-    if is_vec {
-        return Ok(FieldConversionMethod::Iterator);
-    }
-
-    if is_hash_map {
-        return Ok(FieldConversionMethod::HashMap);
-    }
-
-    Ok(FieldConversionMethod::Plain)
+    // No unwrap attributes — determine method recursively from the type
+    Ok(decide_field_method_for_type(&field.ty))
 }
 
 impl ToTokens for FieldIdentifier {
