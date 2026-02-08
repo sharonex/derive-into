@@ -8,7 +8,7 @@ A Rust derive macro for easily creating conversions between structs and enums.
 - Support for struct-to-struct, tuple struct, and enum conversions
 - Field renaming capabilities
 - Automatic handling of wrapped types with `From`/`Into` implementations
-- Special handling for `Option` and `Vec` types
+- Special handling for `Option`, `Vec`, and `HashMap` types, including recursive nested containers
 - Support for both infallible (`From`/`Into`) and fallible (`TryFrom`) conversions
 - Fine-grained control with field-level attributes
 - Support for nested type conversions
@@ -140,8 +140,8 @@ The macro intelligently handles various type scenarios:
 
 1. **Direct Mapping**: Fields with identical types are directly copied
 2. **Automatic Conversion**: Fields with types that implement `From`/`Into` are automatically converted
-3. **Container Types**: Special handling for `Option<T>` and `Vec<T>` with inner type conversion
-4. **HashMap Support**: Automatic conversion of HashMap keys and values
+3. **Container Types**: Special handling for `Option<T>`, `Vec<T>`, and `HashMap<K, V>` with inner type conversion
+4. **Recursive Container Conversion**: Nested containers like `Option<Vec<T>>`, `Vec<Option<T>>`, `HashMap<K, Vec<V>>`, `Option<HashMap<K, V>>`, etc. are converted recursively — inner types are converted at every nesting level
 5. **Tuple Structs**: Support for conversions between tuple structs
 6. **Nested Type Conversions**: Automatically handles nested struct and enum conversions
 
@@ -199,6 +199,46 @@ struct Target {
     vec_values: Vec<Number>,
 }
 ```
+### Recursive Nested Container Conversion
+
+Container types are converted recursively at every nesting level. This means types like `Option<Vec<T>>`, `Vec<Option<T>>`, `Vec<Vec<T>>`, `HashMap<K, Vec<V>>`, and any arbitrary nesting depth just work — inner types are automatically converted using their `From`/`Into`/`TryFrom`/`TryInto` implementations.
+
+```rust
+use derive_into::Convert;
+use std::collections::HashMap;
+
+#[derive(Debug, PartialEq)]
+struct Tag(String);
+
+impl From<String> for Tag {
+    fn from(s: String) -> Self { Tag(s) }
+}
+
+#[derive(Debug, PartialEq)]
+struct Score(u32);
+
+impl From<u32> for Score {
+    fn from(n: u32) -> Self { Score(n) }
+}
+
+#[derive(Convert)]
+#[convert(into(path = "Target"))]
+struct Source {
+    // Option<Vec<T>> — both layers are handled
+    tags: Option<Vec<String>>,
+    // Vec<Option<T>>
+    scores: Vec<Option<u32>>,
+    // HashMap with Vec values
+    grouped: HashMap<String, Vec<u32>>,
+}
+
+struct Target {
+    tags: Option<Vec<Tag>>,
+    scores: Vec<Option<Score>>,
+    grouped: HashMap<String, Vec<Score>>,
+}
+```
+
 ### Using UnwrapOrDefault for Options
 
 ```rust
