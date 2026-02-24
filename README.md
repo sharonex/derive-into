@@ -63,6 +63,7 @@ Struct-level attributes can be applied at the struct or enum level to control co
 | `#[convert(try_from(path = "Type"))]` | Generate a `TryFrom<Type> for Self` implementation |
 | `#[convert(from(path = "Type"))]` | Generate a `From<Type> for Self` implementation |
 | `#[convert(into(path = "Type", default))]` | Enable default values for fields not explicitly mapped in the target type |
+| `#[convert(try_from(path = "Type", validate = "func"))]` | Call a validation function on the source before conversion. Only works with fallible conversions (`try_from`/`try_into`) |
 
 Multiple conversion types can be specified for a single struct:
 
@@ -418,6 +419,41 @@ enum TargetEvent {
         action_type: TargetActionType,
     },
 }
+```
+
+### Pre-Conversion Validation
+
+You can validate the source struct before conversion using the `validate` attribute. The validation function receives a reference to the source and returns a `Result<(), String>`. If validation fails, the conversion returns an error.
+
+```rust
+use derive_into::Convert;
+
+fn validate_source(source: &Source) -> Result<(), String> {
+    if source.name.is_empty() {
+        return Err("name must not be empty".into());
+    }
+    Ok(())
+}
+
+#[derive(Convert)]
+#[convert(try_from(path = "Source", validate = "validate_source"))]
+struct Target {
+    name: String,
+}
+
+struct Source {
+    name: String,
+}
+
+// Validation passes
+let source = Source { name: "hello".into() };
+let target: Result<Target, _> = source.try_into();
+assert!(target.is_ok());
+
+// Validation fails
+let source = Source { name: "".into() };
+let target: Result<Target, _> = source.try_into();
+assert!(target.is_err());
 ```
 
 ### Custom Conversion Functions

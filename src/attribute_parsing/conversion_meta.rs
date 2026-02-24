@@ -8,6 +8,7 @@ pub(crate) struct ConversionMeta {
     pub(crate) method: ConversionMethod,
     // Wether we add ..Default::default() to conversions
     pub(crate) default_allowed: bool,
+    pub(crate) validate: Option<Path>,
 }
 
 impl ConversionMeta {
@@ -54,6 +55,8 @@ struct ConvAttrs {
     path: Path,
     #[darling(default)]
     default: bool,
+    #[darling(default)]
+    validate: Option<Path>,
 }
 
 #[derive(FromDeriveInput)]
@@ -84,43 +87,49 @@ pub(crate) fn extract_conversions(ast: &DeriveInput) -> Vec<ConversionMeta> {
 
     let mut result = Vec::new();
 
-    // Process "into" attribute
     for attr in conversions_data.into {
+        if attr.validate.is_some() {
+            panic!("`validate` is only supported on fallible conversions (`try_from`/`try_into`)");
+        }
         result.push(ConversionMeta {
             source_name: ident_to_path(&conversions_data.ident),
             target_name: attr.path,
             method: ConversionMethod::Into,
             default_allowed: attr.default,
+            validate: None,
         });
     }
 
-    // Process "try_into" attribute
     for attr in conversions_data.try_into {
         result.push(ConversionMeta {
             source_name: ident_to_path(&conversions_data.ident),
             target_name: attr.path,
             method: ConversionMethod::TryInto,
             default_allowed: attr.default,
+            validate: attr.validate,
         });
     }
 
-    // Process "from" attribute
     for attr in conversions_data.from {
+        if attr.validate.is_some() {
+            panic!("`validate` is only supported on fallible conversions (`try_from`/`try_into`)");
+        }
         result.push(ConversionMeta {
             source_name: attr.path,
             target_name: ident_to_path(&conversions_data.ident),
             method: ConversionMethod::From,
             default_allowed: attr.default,
+            validate: None,
         });
     }
 
-    // Process "try_from" attribute
     for attr in conversions_data.try_from {
         result.push(ConversionMeta {
             source_name: attr.path,
             target_name: ident_to_path(&conversions_data.ident),
             method: ConversionMethod::TryFrom,
             default_allowed: attr.default,
+            validate: attr.validate,
         });
     }
 

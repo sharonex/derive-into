@@ -54,6 +54,7 @@ fn implement_struct_conversion(
         target_name,
         method,
         default_allowed,
+        validate,
     } = meta;
 
     if !named_struct && default_allowed {
@@ -81,11 +82,17 @@ fn implement_struct_conversion(
         quote! { String }
     };
 
+    let validate_call = validate.map(|func| quote! {
+        #func(&source).map_err(|e| format!("Failed trying to convert {} to {}: {}",
+            stringify!(#source_name), stringify!(#target_name), e))?;
+    });
+
     Ok(if method.is_falliable() {
         quote! {
             impl TryFrom<#source_name> for #target_name {
                 type Error = #error_type;
                 fn try_from(source: #source_name) -> Result<#target_name, Self::Error> {
+                    #validate_call
                     Ok(#inner)
                 }
             }
