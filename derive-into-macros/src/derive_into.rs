@@ -167,6 +167,7 @@ pub(super) fn field_falliable_conversion(
         default,
         conversion_func,
     }: ConvertibleField,
+    source_type: &Path,
     target_type: &Path,
     named: bool,
     source_prefix: bool,
@@ -181,11 +182,11 @@ pub(super) fn field_falliable_conversion(
         quote! {}
     };
 
-    let source_name = if source_prefix {
+    let field_ident = source_name.as_named();
+    let source_expr = if source_prefix {
         quote!(source.#source_name)
     } else {
-        let source_name = source_name.as_named();
-        quote!(#source_name)
+        quote!(#field_ident)
     };
 
     if default {
@@ -194,35 +195,29 @@ pub(super) fn field_falliable_conversion(
         };
     }
 
-    let error_creator = if cfg!(feature = "anyhow") {
-        quote!(anyhow::anyhow!)
-    } else {
-        quote!(format!)
-    };
-
     if let Some(func) = conversion_func {
         return quote_spanned! { span =>
             #named_start #func(&source).map_err(|e|
-                    #error_creator("Failed trying to convert {} to {}: {:?}",
-                        stringify!(#source_name),
-                        stringify!(#target_type),
-                        e,
-                    )
-                )?,
+                ::derive_into::ConvertError::CustomFunction {
+                    field: stringify!(#field_ident),
+                    from_type: stringify!(#source_type),
+                    to_type: stringify!(#target_type),
+                    details: format!("{:?}", e),
+                }
+            )?,
         };
     }
 
     let map_err = quote! {
-        map_err(|e|
-            #error_creator("Failed trying to convert {} to {}: {}",
-                stringify!(#source_name),
-                stringify!(#target_type),
-                e,
-            )
-        )
+        map_err(|e| ::derive_into::ConvertError::FieldConversion {
+            field: stringify!(#field_ident),
+            from_type: stringify!(#source_type),
+            to_type: stringify!(#target_type),
+            details: format!("{}", e),
+        })
     };
 
-    let expr = fallible_expr(source_name, &method);
+    let expr = fallible_expr(source_expr, &method);
 
     quote_spanned! { span =>
         #named_start #expr.#map_err?,
@@ -287,7 +282,13 @@ pub(super) fn build_field_conversions(
         .iter()
         .map(|field| {
             if meta.method.is_falliable() {
-                field_falliable_conversion(field.clone(), &meta.target_name, named, source_prefix)
+                field_falliable_conversion(
+                    field.clone(),
+                    &meta.source_name,
+                    &meta.target_name,
+                    named,
+                    source_prefix,
+                )
             } else {
                 field_infalliable_conversion(field.clone(), named, source_prefix)
             }

@@ -82,14 +82,17 @@ fn implement_enum_conversion(
     });
 
     let validate_call = validate.map(|func| quote! {
-        #func(&source).map_err(|e| format!("Failed trying to convert {} to {}: {}",
-            stringify!(#source_name), stringify!(#target_name), e))?;
+        #func(&source).map_err(|e| ::derive_into::ConvertError::Validation {
+            from_type: stringify!(#source_name),
+            to_type: stringify!(#target_name),
+            details: format!("{}", e),
+        })?;
     });
 
     Ok(if method.is_falliable() {
         quote! {
             impl TryFrom<#source_name> for #target_name {
-                type Error = String;
+                type Error = ::derive_into::ConvertError;
                 fn try_from(source: #source_name) -> Result<#target_name, Self::Error> {
                     #validate_call
                     Ok(

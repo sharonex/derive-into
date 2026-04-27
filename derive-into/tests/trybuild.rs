@@ -8,4 +8,5 @@ fn test_derive_macro() {
     t.pass("tests/cases/test_field_attributes.rs");
     t.pass("tests/cases/test_nested_containers.rs");
     t.pass("tests/cases/test_enum_repr.rs");
+    t.pass("tests/cases/test_validate.rs");
 }

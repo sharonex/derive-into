@@ -10,9 +10,6 @@ license = "MIT"
 [lib]
 proc-macro = true
 
-[features]
-anyhow = []
-
 [dependencies]
 syn = { version = "2.0.52", features = ["full"] }
 quote = "1"

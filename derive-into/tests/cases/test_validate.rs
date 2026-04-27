@@ -1,4 +1,4 @@
-use derive_convert::Convert;
+use derive_into::Convert;
 
 mod structs {
     use super::*;
@@ -20,8 +20,7 @@ mod structs {
         name: String,
     }
 
-    #[test]
-    fn validate_passes() {
+    pub fn validate_passes() {
         let source = Source {
             name: "hello".into(),
         };
@@ -29,13 +28,12 @@ mod structs {
         assert_eq!(target, Target { name: "hello".into() });
     }
 
-    #[test]
-    fn validate_fails() {
+    pub fn validate_fails() {
         let source = Source { name: "".into() };
         let result: Result<Target, _> = source.try_into();
         assert_eq!(
-            result.unwrap_err(),
-            "Failed trying to convert Source to Target: name must not be empty"
+            result.unwrap_err().to_string(),
+            "Validation failed converting Source to Target: name must not be empty"
         );
     }
 }
@@ -65,20 +63,26 @@ mod enums {
         B(String),
     }
 
-    #[test]
-    fn enum_validate_passes() {
+    pub fn enum_validate_passes() {
         let source = SourceEnum::B("hello".into());
         let target: TargetEnum = source.try_into().unwrap();
         assert_eq!(target, TargetEnum::B("hello".into()));
     }
 
-    #[test]
-    fn enum_validate_fails() {
+    pub fn enum_validate_fails() {
         let source = SourceEnum::B("".into());
         let result: Result<TargetEnum, _> = source.try_into();
         assert_eq!(
-            result.unwrap_err(),
-            "Failed trying to convert SourceEnum to TargetEnum: B value must not be empty"
+            result.unwrap_err().to_string(),
+            "Validation failed converting SourceEnum to TargetEnum: B value must not be empty"
         );
     }
+}
+
+fn main() {
+    structs::validate_passes();
+    structs::validate_fails();
+    enums::enum_validate_passes();
+    enums::enum_validate_fails();
+    println!("validate tests passed");
 }
