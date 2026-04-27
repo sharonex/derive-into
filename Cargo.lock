@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "derive-into"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "derive-into-error",
  "derive-into-macros",
@@ -48,14 +48,14 @@ dependencies = [
 
 [[package]]
 name = "derive-into-error"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "derive-into-macros"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "darling",
  "proc-macro2",
