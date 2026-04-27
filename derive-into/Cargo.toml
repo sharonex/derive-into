@@ -1,0 +1,22 @@
+[package]
+name = "derive-into"
+version = "0.2.4"
+edition = "2024"
+authors = ["Sharon Avni <sharonavni7@gmail.com>"]
+description = "A Rust derive macro for easily creating conversions between structs and enums"
+readme = "../README.md"
+repository = "https://github.com/sharonex/derive-into"
+license = "MIT"
+keywords = ["derive", "convert", "macro", "into", "from"]
+categories = ["development-tools", "rust-patterns"]
+documentation = "https://docs.rs/derive-into"
+
+[features]
+anyhow = ["derive-into-macros/anyhow"]
+
+[dependencies]
+derive-into-macros = { path = "../derive-into-macros", version = "0.2.4" }
+derive-into-error = { path = "../derive-into-error", version = "0.2.4" }
+
+[dev-dependencies]
+trybuild = "1.0"

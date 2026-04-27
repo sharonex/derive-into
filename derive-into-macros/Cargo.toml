@@ -1,0 +1,21 @@
+[package]
+name = "derive-into-macros"
+version = "0.2.4"
+edition = "2024"
+authors = ["Sharon Avni <sharonavni7@gmail.com>"]
+description = "Proc-macro implementation for derive-into"
+repository = "https://github.com/sharonex/derive-into"
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[features]
+anyhow = []
+
+[dependencies]
+syn = { version = "2.0.52", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"
+darling = "0.20.11"
+

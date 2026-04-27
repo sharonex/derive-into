@@ -24,6 +24,9 @@ struct ConvertFieldAttr {
     #[darling(default)]
     default: bool,
 
+    #[darling(default)]
+    enum_repr: bool,
+
     // Add any other field attributes you need
     #[darling(default)]
     rename: Option<String>,
@@ -53,6 +56,9 @@ struct ConvertField {
     unwrap_or_default: bool,
 
     #[darling(default)]
+    enum_repr: bool,
+
+    #[darling(default)]
     with_func: Option<syn::Path>,
 
     // Different conversion types
@@ -78,6 +84,17 @@ pub(crate) enum FieldConversionMethod {
     Option(Box<FieldConversionMethod>),
     Iterator(Box<FieldConversionMethod>),
     HashMap(Box<FieldConversionMethod>, Box<FieldConversionMethod>),
+    /// Represents a prost-style enum field that is stored as `i32` on the
+    /// other side. Lifts through `Option`/`Vec` wrappers; the leaf `Plain`
+    /// position holds an enum value.
+    ///
+    /// Only used when `is_from` is true (proto -> model direction); for the
+    /// reverse direction the enum's `From<Enum> for i32` impl makes the
+    /// regular `Plain` (`.into()`) path work.
+    EnumRepr {
+        enum_path: Path,
+        inner: Box<FieldConversionMethod>,
+    },
 }
 
 #[derive(Clone)]
@@ -162,6 +179,10 @@ pub(crate) fn extract_convertible_fields(
                 attrs.unwrap_or_default
             });
 
+        let enum_repr = field_conv_attrs
+            .as_ref()
+            .map_or(convert_field.enum_repr, |attrs| attrs.enum_repr);
+
         let default = field_conv_attrs
             .as_ref()
             .map_or(convert_field.default, |attrs| attrs.default);
@@ -186,7 +207,7 @@ pub(crate) fn extract_convertible_fields(
             .unwrap_or_else(|| source_name.clone());
 
         // Determine field conversion method
-        let method = decide_field_method(field, is_from, unwrap, unwrap_or_default)?;
+        let method = decide_field_method(field, is_from, unwrap, unwrap_or_default, enum_repr)?;
 
         let conversion_func = field_conv_attrs
             .as_ref()
@@ -244,11 +265,31 @@ fn decide_field_method_for_type(ty: &syn::Type) -> FieldConversionMethod {
     FieldConversionMethod::Plain
 }
 
+/// For `enum_repr` fields, walks `Option<...>` / `Vec<...>` wrappers to find
+/// the leaf path (the enum type). Returns the leaf path together with a
+/// `FieldConversionMethod` mirroring the wrapper structure (`Plain` at the
+/// leaf where the enum lives).
+fn build_enum_repr_method(ty: &syn::Type) -> Option<(Path, FieldConversionMethod)> {
+    if let Some(inner_ty) = extract_inner_type(ty, "Option") {
+        let (path, inner) = build_enum_repr_method(inner_ty)?;
+        return Some((path, FieldConversionMethod::Option(Box::new(inner))));
+    }
+    if let Some(inner_ty) = extract_inner_type(ty, "Vec") {
+        let (path, inner) = build_enum_repr_method(inner_ty)?;
+        return Some((path, FieldConversionMethod::Iterator(Box::new(inner))));
+    }
+    if let syn::Type::Path(type_path) = ty {
+        return Some((type_path.path.clone(), FieldConversionMethod::Plain));
+    }
+    None
+}
+
 pub(crate) fn decide_field_method(
     field: &Field,
     is_from: bool,
     unwrap: bool,
     unwrap_or_default: bool,
+    enum_repr: bool,
 ) -> syn::Result<FieldConversionMethod> {
     let is_option = is_surrounding_type(&field.ty, "Option");
 
@@ -257,6 +298,29 @@ pub(crate) fn decide_field_method(
             &field.ty,
             "Cannot use both unwrap and unwrap_or_default",
         ));
+    }
+
+    if enum_repr && (unwrap || unwrap_or_default) {
+        return Err(syn::Error::new_spanned(
+            &field.ty,
+            "enum_repr cannot be combined with unwrap / unwrap_or_default",
+        ));
+    }
+
+    // `enum_repr` only changes behavior in the From / TryFrom direction
+    // (i32 -> Enum, where prost only emits TryFrom). For Into / TryInto the
+    // regular `Plain` path works because prost emits `From<Enum> for i32`.
+    if enum_repr && is_from {
+        let (enum_path, inner) = build_enum_repr_method(&field.ty).ok_or_else(|| {
+            syn::Error::new_spanned(
+                &field.ty,
+                "enum_repr field must be a path type, optionally wrapped in Option<..> or Vec<..>",
+            )
+        })?;
+        return Ok(FieldConversionMethod::EnumRepr {
+            enum_path,
+            inner: Box::new(inner),
+        });
     }
 
     if unwrap || unwrap_or_default {

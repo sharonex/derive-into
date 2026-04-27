@@ -11,6 +11,60 @@ use crate::{
     struct_convert::implement_all_struct_conversions,
 };
 
+/// Lowers an `EnumRepr` method's `inner` wrapper structure (`Plain` /
+/// `Option(Plain)` / `Iterator(Plain)`) into an expression that converts
+/// `i32` (or a container of `i32`) into `enum_path` (or a container of it).
+/// `unwrap_or_default()` is used at the leaf so unknown enum tags map to the
+/// default variant — matching prost's accessor semantics.
+fn enum_repr_infallible_lift(
+    value: TokenStream2,
+    enum_path: &Path,
+    method: &FieldConversionMethod,
+) -> TokenStream2 {
+    match method {
+        FieldConversionMethod::Plain => quote! {
+            <#enum_path as ::core::convert::TryFrom<i32>>::try_from(#value).unwrap_or_default()
+        },
+        FieldConversionMethod::Option(inner) => {
+            let inner_expr = enum_repr_infallible_lift(quote!(v), enum_path, inner);
+            quote!(#value.map(|v| #inner_expr))
+        }
+        FieldConversionMethod::Iterator(inner) => {
+            let inner_expr = enum_repr_infallible_lift(quote!(v), enum_path, inner);
+            quote!(#value.into_iter().map(|v| #inner_expr).collect())
+        }
+        _ => quote! {
+            compile_error!("enum_repr only supports Plain / Option / Vec wrappers");
+        },
+    }
+}
+
+/// Fallible counterpart of `enum_repr_infallible_lift` — propagates the
+/// underlying `TryFrom<i32>` error via `?` instead of swallowing it.
+fn enum_repr_fallible_lift(
+    value: TokenStream2,
+    enum_path: &Path,
+    method: &FieldConversionMethod,
+) -> TokenStream2 {
+    match method {
+        FieldConversionMethod::Plain => quote! {
+            <#enum_path as ::core::convert::TryFrom<i32>>::try_from(#value)
+                .map_err(|e| format!("{:?}", e))
+        },
+        FieldConversionMethod::Option(inner) => {
+            let inner_expr = enum_repr_fallible_lift(quote!(v), enum_path, inner);
+            quote!(#value.map(|v| #inner_expr).transpose())
+        }
+        FieldConversionMethod::Iterator(inner) => {
+            let inner_expr = enum_repr_fallible_lift(quote!(v), enum_path, inner);
+            quote!(#value.into_iter().map(|v| #inner_expr).collect::<Result<_, _>>())
+        }
+        _ => quote! {
+            compile_error!("enum_repr only supports Plain / Option / Vec wrappers");
+        },
+    }
+}
+
 /// Generate an infallible conversion expression for a value according to the
 /// recursive `FieldConversionMethod`. Returns a `TokenStream` that evaluates
 /// to the converted value.
@@ -49,6 +103,9 @@ fn infallible_expr(value: TokenStream2, method: &FieldConversionMethod) -> Token
         FieldConversionMethod::SomeOption(inner) => {
             let inner_expr = infallible_expr(value, inner);
             quote!(Some(#inner_expr))
+        }
+        FieldConversionMethod::EnumRepr { enum_path, inner } => {
+            enum_repr_infallible_lift(value, enum_path, inner)
         }
     }
 }
@@ -93,6 +150,9 @@ fn fallible_expr(value: TokenStream2, method: &FieldConversionMethod) -> TokenSt
         FieldConversionMethod::SomeOption(inner) => {
             let inner_expr = fallible_expr(value, inner);
             quote!(#inner_expr.map(Some))
+        }
+        FieldConversionMethod::EnumRepr { enum_path, inner } => {
+            enum_repr_fallible_lift(value, enum_path, inner)
         }
     }
 }
