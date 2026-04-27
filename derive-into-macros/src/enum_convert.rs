@@ -38,6 +38,7 @@ fn implement_enum_conversion(
         method,
         default_allowed,
         validate,
+        wrap_unit: enum_wrap_unit,
     } = meta.clone();
 
     let default_fields = if default_allowed {
@@ -46,12 +47,14 @@ fn implement_enum_conversion(
         quote! {}
     };
 
+    let is_from = method.is_from();
     let variant_conversions = variants.iter().map(|variant| {
         let ConversionVariant {
             source_name: source_variant_name,
             target_name: target_variant_name,
             named_variant,
             fields,
+            wrap_unit,
         } = variant;
 
         let source_fields = fields.iter().map(|f| f.source_name.as_named());
@@ -60,6 +63,21 @@ fn implement_enum_conversion(
             build_field_conversions(&meta, *named_variant, false, fields).unwrap();
 
         if variant.fields.is_empty() {
+            if *wrap_unit || enum_wrap_unit {
+                // The deriving enum's variant is a unit variant, but the other
+                // side encodes it as `Variant(())` (e.g. prost-generated proto
+                // oneof enums). Emit the wrapping `()` on whichever side is
+                // the proto type for this conversion direction.
+                return if is_from {
+                    quote! {
+                        #source_name::#source_variant_name(_) => #target_name::#target_variant_name,
+                    }
+                } else {
+                    quote! {
+                        #source_name::#source_variant_name => #target_name::#target_variant_name(::core::default::Default::default()),
+                    }
+                };
+            }
             return quote! {
                 #source_name::#source_variant_name => #target_name::#target_variant_name,
             };

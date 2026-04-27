@@ -55,6 +55,7 @@ fn implement_struct_conversion(
         method,
         default_allowed,
         validate,
+        wrap_unit: _,
     } = meta;
 
     if !named_struct && default_allowed {

@@ -9,6 +9,10 @@ pub(crate) struct ConversionMeta {
     // Wether we add ..Default::default() to conversions
     pub(crate) default_allowed: bool,
     pub(crate) validate: Option<Path>,
+    /// When true, all unit variants of the deriving enum are wrapped as
+    /// `Variant(())` on the other side (prost proto-oneof convention).
+    /// Per-variant `#[convert(wrap_unit)]` still works as an override.
+    pub(crate) wrap_unit: bool,
 }
 
 impl ConversionMeta {
@@ -57,6 +61,8 @@ struct ConvAttrs {
     default: bool,
     #[darling(default)]
     validate: Option<Path>,
+    #[darling(default)]
+    wrap_unit: bool,
 }
 
 #[derive(FromDeriveInput)]
@@ -97,6 +103,7 @@ pub(crate) fn extract_conversions(ast: &DeriveInput) -> Vec<ConversionMeta> {
             method: ConversionMethod::Into,
             default_allowed: attr.default,
             validate: None,
+            wrap_unit: attr.wrap_unit,
         });
     }
 
@@ -107,6 +114,7 @@ pub(crate) fn extract_conversions(ast: &DeriveInput) -> Vec<ConversionMeta> {
             method: ConversionMethod::TryInto,
             default_allowed: attr.default,
             validate: attr.validate,
+            wrap_unit: attr.wrap_unit,
         });
     }
 
@@ -120,6 +128,7 @@ pub(crate) fn extract_conversions(ast: &DeriveInput) -> Vec<ConversionMeta> {
             method: ConversionMethod::From,
             default_allowed: attr.default,
             validate: None,
+            wrap_unit: attr.wrap_unit,
         });
     }
 
@@ -130,6 +139,7 @@ pub(crate) fn extract_conversions(ast: &DeriveInput) -> Vec<ConversionMeta> {
             method: ConversionMethod::TryFrom,
             default_allowed: attr.default,
             validate: attr.validate,
+            wrap_unit: attr.wrap_unit,
         });
     }
 

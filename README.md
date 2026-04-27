@@ -64,6 +64,7 @@ Struct-level attributes can be applied at the struct or enum level to control co
 | `#[convert(from(path = "Type"))]` | Generate a `From<Type> for Self` implementation |
 | `#[convert(into(path = "Type", default))]` | Enable default values for fields not explicitly mapped in the target type |
 | `#[convert(try_from(path = "Type", validate = "func"))]` | Call a validation function on the source before conversion. Only works with fallible conversions (`try_from`/`try_into`) |
+| `#[convert(into(path = "Type", wrap_unit))]` | For enums: every unit variant on this side maps to a tuple variant `Variant(Default::default())` on the other side. Useful for prost-generated proto oneof enums (`Land(())`, `VtolCalibrateAirspeed(super::VtolCalibrateAirspeed)`, ...). The wrapped value uses `Default::default()`, so it works with both `()` and any prost `Message` struct |
 
 Multiple conversion types can be specified for a single struct:
 
@@ -123,6 +124,11 @@ enum SourceEnum {
         field: u8,
     },
     Unit,
+
+    // Unit variant on this side maps to a tuple variant `Unit2(())` on the
+    // other side (e.g. prost-generated proto oneof enums).
+    #[convert(wrap_unit)]
+    Unit2,
 }
 
 enum TargetEnum {
@@ -132,8 +138,17 @@ enum TargetEnum {
         renamed_field: u32,
     },
     Unit,
+    Unit2(()),
 }
 ```
+
+Variant-level attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| `#[convert(rename = "Other")]` | Map this variant to a different name on the other side |
+| `#[convert(skip)]` | Skip this variant entirely |
+| `#[convert(wrap_unit)]` | The unit variant on the deriving enum corresponds to a tuple variant `Variant(Default::default())` on the other side (e.g. `Variant(())` or `Variant(SomeProstMessage)`). Can also be set at the enum level via `#[convert(into(path = "...", wrap_unit))]` to apply to all unit variants at once |
 
 ## Type Conversions
 

@@ -13,6 +13,8 @@ struct VariantConvAttrs {
     // Add other variant-specific attributes here
     #[darling(default)]
     skip: bool,
+    #[darling(default)]
+    wrap_unit: bool,
 }
 
 #[derive(FromVariant)]
@@ -23,6 +25,8 @@ struct ConvertVariant {
     rename: Option<String>,
     #[darling(default)]
     skip: bool,
+    #[darling(default)]
+    wrap_unit: bool,
 
     // Different conversion types for variants
     #[darling(default)]
@@ -41,6 +45,10 @@ pub(crate) struct ConversionVariant {
     pub(crate) target_name: syn::Ident,
     pub(crate) named_variant: bool,
     pub(crate) fields: Vec<ConvertibleField>,
+    /// When true, the unit (no-field) variant on the deriving enum maps to a
+    /// tuple variant `Variant(())` on the other side. Used for prost-generated
+    /// proto enums where unit-like cases are encoded as `Variant(())`.
+    pub(crate) wrap_unit: bool,
 }
 
 pub(crate) fn extract_enum_variants(
@@ -96,11 +104,17 @@ pub(crate) fn extract_enum_variants(
                 (convert_variant.ident.clone(), other_variant_name)
             };
 
+            let wrap_unit = convert_variant.wrap_unit
+                || variant_conv_attrs
+                    .as_ref()
+                    .is_some_and(|attrs| attrs.wrap_unit);
+
             Ok(Some(ConversionVariant {
                 source_name,
                 target_name,
                 named_variant,
                 fields: extract_convertible_fields(&variant.fields, conversion_type, other_type)?,
+                wrap_unit,
             }))
         })
         .filter_map(|result| result.transpose())

@@ -120,6 +120,58 @@ enum TargetActionType {
     CreateNew, // Renamed
 }
 
+// Mimics prost-generated proto oneof variants: unit-like cases become tuple
+// variants holding either `()` or an empty `Message` struct (both `Default`).
+#[derive(Debug, Default, PartialEq, Clone)]
+struct CalibrateAirspeed {}
+
+#[derive(Debug, PartialEq, Clone)]
+enum ProtoTask {
+    Land(()),
+    Takeoff(()),
+    Calibrate(CalibrateAirspeed),
+    Run(u64),
+}
+
+// Enum-level `wrap_unit` covers all unit variants in one shot.
+#[derive(Convert, Debug, PartialEq, Clone)]
+#[convert(into(path = "ProtoTask", wrap_unit))]
+#[convert(try_from(path = "ProtoTask", wrap_unit))]
+enum AssetTask {
+    Land,
+    Takeoff,
+    Calibrate,
+    Run(u64),
+}
+
+#[cfg(test)]
+mod wrap_unit_tests {
+    use super::*;
+
+    #[test]
+    fn wrap_unit_into() {
+        let proto: ProtoTask = AssetTask::Land.into();
+        assert_eq!(proto, ProtoTask::Land(()));
+        let proto: ProtoTask = AssetTask::Takeoff.into();
+        assert_eq!(proto, ProtoTask::Takeoff(()));
+        let proto: ProtoTask = AssetTask::Calibrate.into();
+        assert_eq!(proto, ProtoTask::Calibrate(CalibrateAirspeed {}));
+        let proto: ProtoTask = AssetTask::Run(7).into();
+        assert_eq!(proto, ProtoTask::Run(7));
+    }
+
+    #[test]
+    fn wrap_unit_try_from() {
+        assert_eq!(AssetTask::try_from(ProtoTask::Land(())).unwrap(), AssetTask::Land);
+        assert_eq!(AssetTask::try_from(ProtoTask::Takeoff(())).unwrap(), AssetTask::Takeoff);
+        assert_eq!(
+            AssetTask::try_from(ProtoTask::Calibrate(CalibrateAirspeed {})).unwrap(),
+            AssetTask::Calibrate
+        );
+        assert_eq!(AssetTask::try_from(ProtoTask::Run(9)).unwrap(), AssetTask::Run(9));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
