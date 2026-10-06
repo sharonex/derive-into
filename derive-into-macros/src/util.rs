@@ -21,11 +21,14 @@ pub(crate) fn extract_inner_type<'a>(
     None
 }
 
-pub(crate) fn extract_hashmap_inner_types(ty: &syn::Type) -> Option<(&syn::Type, &syn::Type)> {
+pub(crate) fn extract_hashmap_inner_types<'a>(
+    ty: &'a syn::Type,
+    surrounding_type: &str,
+) -> Option<(&'a syn::Type, &'a syn::Type)> {
     if let syn::Type::Path(type_path) = ty {
         if type_path.path.segments.len() == 1 {
             let segment = &type_path.path.segments[0];
-            if segment.ident == "HashMap" {
+            if segment.ident == surrounding_type {
                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
                     let mut types = args.args.iter().filter_map(|arg| {
                         if let syn::GenericArgument::Type(ty) = arg {

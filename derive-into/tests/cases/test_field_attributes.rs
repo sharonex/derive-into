@@ -1,4 +1,5 @@
 use derive_into::Convert;
+use indexmap::IndexMap;
 use std::collections::HashMap;
 
 // Test structures and implementations for use in our tests
@@ -180,6 +181,7 @@ struct SourceContainer {
     opt_value: Option<u32>,
     vec_values: Vec<u32>,
     map_values: HashMap<String, u32>,
+    indexmap_values: IndexMap<String, u32>,
 }
 
 #[derive(Convert, Debug, PartialEq, Default)]
@@ -187,6 +189,7 @@ struct TargetContainer {
     opt_value: Option<Number>,
     vec_values: Vec<Number>,
     map_values: HashMap<String, Number>,
+    indexmap_values: IndexMap<String, Number>,
 }
 
 // =================== Test 9: Type conversion ===================
@@ -483,10 +486,15 @@ fn test_container_conversion() {
     map.insert("key1".to_string(), 1);
     map.insert("key2".to_string(), 2);
 
+    let mut indexmap = IndexMap::new();
+    indexmap.insert("key1".to_string(), 1);
+    indexmap.insert("key2".to_string(), 2);
+
     let source = SourceContainer {
         opt_value: Some(42),
         vec_values: vec![1, 2, 3],
         map_values: map,
+        indexmap_values: indexmap,
     };
 
     // Test conversion from u32 containers to Number containers
@@ -505,6 +513,11 @@ fn test_container_conversion() {
     assert_eq!(target.map_values.len(), 2);
     assert_eq!(target.map_values.get("key1"), Some(&Number(1)));
     assert_eq!(target.map_values.get("key2"), Some(&Number(2)));
+
+    // Check IndexMap conversion
+    assert_eq!(target.indexmap_values.len(), 2);
+    assert_eq!(target.indexmap_values.get("key1"), Some(&Number(1)));
+    assert_eq!(target.indexmap_values.get("key2"), Some(&Number(2)));
 
     // Test conversion back from Number containers to u32 containers
     let source_back: SourceContainer = target.into();

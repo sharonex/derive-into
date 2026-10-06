@@ -8,7 +8,7 @@ A Rust derive macro for easily creating conversions between structs and enums.
 - Support for struct-to-struct, tuple struct, and enum conversions
 - Field renaming capabilities
 - Automatic handling of wrapped types with `From`/`Into` implementations
-- Special handling for `Option`, `Vec`, and `HashMap` types, including recursive nested containers
+- Special handling for `Option`, `Vec`, `HashMap`, and `IndexMap` types, including recursive nested containers
 - Support for both infallible (`From`/`Into`) and fallible (`TryFrom`) conversions
 - Fine-grained control with field-level attributes
 - Support for nested type conversions

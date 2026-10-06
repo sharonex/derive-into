@@ -84,6 +84,8 @@ pub(crate) enum FieldConversionMethod {
     Option(Box<FieldConversionMethod>),
     Iterator(Box<FieldConversionMethod>),
     HashMap(Box<FieldConversionMethod>, Box<FieldConversionMethod>),
+    #[cfg(feature = "indexmap")]
+    IndexMap(Box<FieldConversionMethod>, Box<FieldConversionMethod>),
     /// Represents a prost-style enum field that is stored as `i32` on the
     /// other side. Lifts through `Option`/`Vec` wrappers; the leaf `Plain`
     /// position holds an enum value.
@@ -247,7 +249,7 @@ pub(crate) fn extract_convertible_fields(
 }
 
 /// Recursively determines the conversion method for a type by inspecting
-/// nested container types (Option, Vec, HashMap).
+/// nested container types (Option, Vec, HashMap, IndexMap).
 fn decide_field_method_for_type(ty: &syn::Type) -> FieldConversionMethod {
     if let Some(inner_ty) = extract_inner_type(ty, "Option") {
         let inner = decide_field_method_for_type(inner_ty);
@@ -257,10 +259,16 @@ fn decide_field_method_for_type(ty: &syn::Type) -> FieldConversionMethod {
         let inner = decide_field_method_for_type(inner_ty);
         return FieldConversionMethod::Iterator(Box::new(inner));
     }
-    if let Some((key_ty, val_ty)) = extract_hashmap_inner_types(ty) {
+    if let Some((key_ty, val_ty)) = extract_hashmap_inner_types(ty, "HashMap") {
         let key_inner = decide_field_method_for_type(key_ty);
         let val_inner = decide_field_method_for_type(val_ty);
         return FieldConversionMethod::HashMap(Box::new(key_inner), Box::new(val_inner));
+    }
+    #[cfg(feature = "indexmap")]
+    if let Some((key_ty, val_ty)) = extract_hashmap_inner_types(ty, "IndexMap") {
+        let key_inner = decide_field_method_for_type(key_ty);
+        let val_inner = decide_field_method_for_type(val_ty);
+        return FieldConversionMethod::IndexMap(Box::new(key_inner), Box::new(val_inner));
     }
     FieldConversionMethod::Plain
 }

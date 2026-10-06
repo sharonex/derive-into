@@ -15,4 +15,7 @@ syn = { version = "2.0.52", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
 darling = "0.20.11"
+indexmap = { version = "2.14.2", optional = true }
 
+[features]
+indexmap = ["dep:indexmap"]
