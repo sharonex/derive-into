@@ -17,3 +17,8 @@ derive-into-error = { path = "../derive-into-error", version = "0.3.0" }
 
 [dev-dependencies]
 trybuild = "1.0"
+indexmap = { version = "2.14.2" }
+derive-into-macros = { path = "../derive-into-macros", version = "0.3.0", features = ["indexmap"] }
+
+[features]
+indexmap = ["derive-into-macros/indexmap"]

@@ -16,3 +16,5 @@ quote = "1"
 proc-macro2 = "1"
 darling = "0.20.11"
 
+[features]
+indexmap = []

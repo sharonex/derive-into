@@ -1,4 +1,5 @@
 use derive_into::Convert;
+use indexmap::IndexMap;
 use std::collections::HashMap;
 
 // Custom wrapper types for demonstration
@@ -78,6 +79,10 @@ struct Product {
     #[convert(rename = "price_by_region")]
     regional_prices: HashMap<String, f64>,
 
+    // IndexMap with key type conversion
+    #[convert(rename = "price_by_region_sorted")]
+    regional_prices_sorted: IndexMap<String, f64>,
+
     // Nested struct with its own conversion
     manufacturer: Manufacturer,
 
@@ -117,6 +122,7 @@ struct ApiProduct {
     description: Option<String>,
     variants: Vec<ApiProductVariant>,
     price_by_region: HashMap<String, Money>,
+    price_by_region_sorted: IndexMap<String, Money>,
     manufacturer: ApiManufacturer,
 
     // This field doesn't exist in the source, will use default
@@ -198,6 +204,13 @@ mod tests {
                 prices.insert("UK".to_string(), 189.99);
                 prices
             },
+            regional_prices_sorted: {
+                let mut prices = IndexMap::new();
+                prices.insert("US".to_string(), 199.99);
+                prices.insert("EU".to_string(), 249.99);
+                prices.insert("UK".to_string(), 189.99);
+                prices
+            },
             manufacturer: Manufacturer {
                 name: NonEmptyString("ErgoDesigns".to_string()),
                 country: "Germany".to_string(),
@@ -233,6 +246,13 @@ mod tests {
         assert_eq!(api_product.price_by_region.len(), 3);
         assert_eq!(api_product.price_by_region.get("US"), Some(&Money(199.99)));
 
+        // Check IndexMap conversion
+        assert_eq!(api_product.price_by_region_sorted.len(), 3);
+        assert_eq!(
+            api_product.price_by_region_sorted.get("US"),
+            Some(&Money(199.99))
+        );
+
         // Check nested struct conversion
         assert_eq!(api_product.manufacturer.name, "ErgoDesigns".to_string());
         assert_eq!(
@@ -257,6 +277,12 @@ mod tests {
             }],
             price_by_region: {
                 let mut prices = HashMap::new();
+                prices.insert("US".to_string(), Money(349.99));
+                prices.insert("CA".to_string(), Money(399.99));
+                prices
+            },
+            price_by_region_sorted: {
+                let mut prices = IndexMap::new();
                 prices.insert("US".to_string(), Money(349.99));
                 prices.insert("CA".to_string(), Money(399.99));
                 prices
@@ -292,6 +318,10 @@ mod tests {
         assert_eq!(product.regional_prices.len(), 2);
         assert_eq!(product.regional_prices.get("US"), Some(&349.99));
 
+        // Check IndexMap conversion
+        assert_eq!(product.regional_prices_sorted.len(), 2);
+        assert_eq!(product.regional_prices_sorted.get("US"), Some(&349.99));
+
         // Check nested struct conversion
         assert_eq!(product.manufacturer.name.as_str(), "DeskCraft");
         assert_eq!(
@@ -309,6 +339,7 @@ mod tests {
             description: None,
             variants: vec![],
             price_by_region: HashMap::new(),
+            price_by_region_sorted: IndexMap::new(),
             manufacturer: ApiManufacturer {
                 name: "Manufacturer".to_string(),
                 country: "Country".to_string(),
@@ -354,6 +385,12 @@ fn main() {
         }],
         regional_prices: {
             let mut prices = HashMap::new();
+            prices.insert("US".to_string(), 99.99);
+            prices.insert("EU".to_string(), 89.99);
+            prices
+        },
+        regional_prices_sorted: {
+            let mut prices = IndexMap::new();
             prices.insert("US".to_string(), 99.99);
             prices.insert("EU".to_string(), 89.99);
             prices

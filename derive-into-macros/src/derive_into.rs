@@ -84,6 +84,12 @@ fn infallible_expr(value: TokenStream2, method: &FieldConversionMethod) -> Token
             let val_expr = infallible_expr(quote!(v), val_method);
             quote!(#value.into_iter().map(|(k, v)| (#key_expr, #val_expr)).collect())
         }
+        #[cfg(feature = "indexmap")]
+        FieldConversionMethod::IndexMap(key_method, val_method) => {
+            let key_expr = infallible_expr(quote!(k), key_method);
+            let val_expr = infallible_expr(quote!(v), val_method);
+            quote!(#value.into_iter().map(|(k, v)| (#key_expr, #val_expr)).collect())
+        }
         FieldConversionMethod::UnwrapOption(inner) => {
             let inner_expr = infallible_expr(quote!(__unwrapped), inner);
             quote!({
@@ -128,6 +134,18 @@ fn fallible_expr(value: TokenStream2, method: &FieldConversionMethod) -> TokenSt
             let val_expr = fallible_expr(quote!(v), val_method);
             quote!((|| -> Result<_, String> {
                 let mut result = ::std::collections::HashMap::new();
+                for (k, v) in #value {
+                    result.insert(#key_expr?, #val_expr?);
+                }
+                Ok(result)
+            })())
+        }
+        #[cfg(feature = "indexmap")]
+        FieldConversionMethod::IndexMap(key_method, val_method) => {
+            let key_expr = fallible_expr(quote!(k), key_method);
+            let val_expr = fallible_expr(quote!(v), val_method);
+            quote!((|| -> Result<_, String> {
+                let mut result = indexmap::IndexMap::new();
                 for (k, v) in #value {
                     result.insert(#key_expr?, #val_expr?);
                 }

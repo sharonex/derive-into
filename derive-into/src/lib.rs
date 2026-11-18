@@ -120,7 +120,7 @@
 //!
 //! * **Direct mapping**: Identical types are copied directly
 //! * **Automatic conversion**: Uses `From`/`Into` for different types
-//! * **Container types**: Handles `Option<T>`, `Vec<T>`, and `HashMap<K,V>`
+//! * **Container types**: Handles `Option<T>`, `Vec<T>`, `HashMap<K,V>`, and `IndexMap<K,V>`
 //! * **Nested conversions**: Converts nested structs/enums automatically
 //!
 //! ## Container Type Examples
