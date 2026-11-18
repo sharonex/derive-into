@@ -59,7 +59,6 @@ name = "derive-into-macros"
 version = "0.3.0"
 dependencies = [
  "darling",
- "indexmap",
  "proc-macro2",
  "quote",
  "syn",
