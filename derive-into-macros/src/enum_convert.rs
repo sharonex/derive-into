@@ -99,12 +99,14 @@ fn implement_enum_conversion(
         }
     });
 
-    let validate_call = validate.map(|func| quote! {
-        #func(&source).map_err(|e| ::derive_into::ConvertError::Validation {
-            from_type: stringify!(#source_name),
-            to_type: stringify!(#target_name),
-            details: format!("{}", e),
-        })?;
+    let validate_call = validate.map(|func| {
+        quote! {
+            #func(&source).map_err(|e| ::derive_into::ConvertError::Validation {
+                from_type: stringify!(#source_name),
+                to_type: stringify!(#target_name),
+                details: format!("{}", e),
+            })?;
+        }
     });
 
     Ok(if method.is_falliable() {
